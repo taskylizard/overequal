@@ -13,8 +13,13 @@ import org.jetbrains.kotlinx.kandy.util.context.invoke
  * reference). Built on `Style.None` so nothing from a base theme leaks through.
  */
 object ChartStyle {
-    fun Layout.flexoki(showLegend: Boolean = false) {
-        style(Style.None) {
+    fun Layout.flexoki(
+        showLegend: Boolean = false,
+        blankAxes: Boolean = false,
+    ) {
+        // Pie/donut charts use Style.Void (no axes/grid); everything else builds on
+        // Style.None and draws a faint major grid.
+        style(if (blankAxes) Style.Void else Style.None) {
             global {
                 background {
                     fillColor = Theme.PAPER
@@ -30,16 +35,19 @@ object ChartStyle {
                     borderLineWidth = 0.0
                 }
             }
-            panel.grid {
-                majorLine {
-                    color = Theme.GRID
-                    width = 0.4
+            if (!blankAxes) {
+                panel.grid {
+                    majorLine {
+                        color = Theme.GRID
+                        width = 0.4
+                    }
+                    minorLine { blank = true }
                 }
-                minorLine { blank = true }
             }
             legend {
                 position = if (showLegend) LegendPosition.Right else LegendPosition.None
             }
+            if (blankAxes) blankAxes()
         }
     }
 
@@ -53,10 +61,11 @@ object ChartStyle {
         width: Int = 1100,
         height: Int = 850,
         showLegend: Boolean = false,
+        blankAxes: Boolean = false,
     ) {
         this.title = title
         this.subtitle = ds.subtitle()
         this.size = width to height
-        flexoki(showLegend)
+        flexoki(showLegend, blankAxes)
     }
 }

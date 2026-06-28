@@ -50,7 +50,7 @@ object RenderCli {
 
         for (viz in targets) {
             val bytes =
-                runCatching { viz.render(ds) }.getOrElse {
+                runCatching { Visualizations.render(viz, ds) }.getOrElse {
                     log.error("failed to render {}: {}", viz.id, it.message, it)
                     null
                 }

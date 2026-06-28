@@ -105,6 +105,20 @@ Pixel-perfect parity with matplotlib (donut leader lines, dual fonts, RGBA heatm
 non-goal; faithful intent + the Flexoki theme is. Discord4J/serialization/Kandy are all
 external deps per the user's preference.
 
+## Secrets / running the bot
+
+- The bot token lives in `.env` as `DISCORD_TOKEN` (gitignored). The bot loads it from
+  there (or the `DISCORD_TOKEN` env var). Never commit `.env` or print the token.
+
+## Known quirks
+
+- Kandy 0.8.4 `pie` ignores theme axis-blanking (`Style.Void`/`blankAxes()` have no
+  effect on the cartesian axes drawn around a pie) — the donut shows faint axes. Cosmetic;
+  revisit later (possibly via a coord tweak or a newer Kandy).
+
 ## Status
 
+Visualizations done (render from the corpus, verified against a 60k sample): top30,
+weekly_rate, share_pie (donut), mention_ratio, hourly, message_length,
+messages_per_day_dist, clt_daily, message_length_per_member, unique_members, top30_words.
 See `git log` for the running checkpoint history.

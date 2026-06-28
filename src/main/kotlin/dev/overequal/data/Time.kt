@@ -41,4 +41,16 @@ object Time {
     }
 
     fun isoString(t: Instant): String = ISO.format(t.atOffset(ZoneOffset.UTC))
+
+    /**
+     * A date as a fractional year (e.g. 2024-07-01 ≈ 2024.5). Kandy 0.8.4 has no
+     * temporal axis, so time-series charts use this on a continuous x — the
+     * "nice" tick algorithm then lands ticks on whole years, which read as dates.
+     */
+    fun yearFraction(d: LocalDate): Double {
+        val len = if (d.isLeapYear) 366.0 else 365.0
+        return d.year + (d.dayOfYear - 1) / len
+    }
+
+    fun yearFraction(t: Instant): Double = yearFraction(date(t))
 }

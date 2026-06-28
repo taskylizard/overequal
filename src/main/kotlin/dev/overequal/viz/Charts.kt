@@ -3,11 +3,19 @@ package dev.overequal.viz
 import dev.overequal.data.Dataset
 import dev.overequal.viz.ChartStyle.standard
 import org.jetbrains.kotlinx.kandy.dsl.categorical
+import org.jetbrains.kotlinx.kandy.dsl.continuous
 import org.jetbrains.kotlinx.kandy.dsl.plot
 import org.jetbrains.kotlinx.kandy.ir.Plot
 import org.jetbrains.kotlinx.kandy.letsplot.feature.layout
+import org.jetbrains.kotlinx.kandy.letsplot.layers.area
+import org.jetbrains.kotlinx.kandy.letsplot.layers.bars
 import org.jetbrains.kotlinx.kandy.letsplot.layers.barsH
+import org.jetbrains.kotlinx.kandy.letsplot.layers.pie
+import org.jetbrains.kotlinx.kandy.letsplot.layers.points
+import org.jetbrains.kotlinx.kandy.letsplot.layers.tiles
 import org.jetbrains.kotlinx.kandy.util.color.Color
+import kotlin.math.ceil
+import kotlin.math.floor
 
 /**
  * Reusable Kandy chart builders carrying the Flexoki look. Kept here so each
@@ -42,6 +50,150 @@ object Charts {
                 x(values) { axis.name = xLabel }
                 fillColor(labels) {
                     scale = categorical(*labels.zip(colors).toTypedArray())
+                }
+            }
+            layout { standard(title, ds, width, height) }
+        }
+    }
+
+    /**
+     * Vertical bars over a continuous x, coloured by a frequency gradient within
+     * one [hue] (darker = larger, config rule 7). Used for the hourly chart and
+     * the histograms.
+     */
+    fun frequencyBars(
+        ds: Dataset,
+        title: String,
+        xLabel: String,
+        yLabel: String,
+        x: List<Double>,
+        y: List<Double>,
+        hue: Map<Int, Color>,
+        width: Int = 1300,
+        height: Int = 760,
+    ): Plot =
+        plot {
+            bars {
+                x(x) { axis.name = xLabel }
+                y(y) { axis.name = yLabel }
+                fillColor(y) {
+                    scale = continuous(range = hue.getValue(200)..hue.getValue(800))
+                }
+            }
+            layout { standard(title, ds, width, height) }
+        }
+
+    /** A line with a faint filled area beneath it (cumulative-over-time charts). */
+    fun lineArea(
+        ds: Dataset,
+        title: String,
+        xLabel: String,
+        yLabel: String,
+        x: List<Double>,
+        y: List<Double>,
+        color: Color,
+        width: Int = 1100,
+        height: Int = 620,
+    ): Plot =
+        plot {
+            area {
+                x(x) {
+                    axis.name = xLabel
+                    val years = ceil(x.min()).toInt()..floor(x.max()).toInt()
+                    if (years.first <= years.last) {
+                        axis.breaksLabeled(years.map { it.toDouble() }, years.map { it.toString() })
+                    }
+                }
+                y(y) { axis.name = yLabel }
+                fillColor = color
+                alpha = 0.12
+                borderLine.color = color
+                borderLine.width = 2.0
+            }
+            layout { standard(title, ds, width, height) }
+        }
+
+    /** A donut chart with leader-free categorical slices. */
+    fun donut(
+        ds: Dataset,
+        title: String,
+        labels: List<String>,
+        values: List<Double>,
+        colors: List<Color>,
+        showLegend: Boolean = true,
+        width: Int = 1000,
+        height: Int = 900,
+    ): Plot =
+        plot {
+            pie {
+                slice(values)
+                fillColor(labels) {
+                    scale = categorical(*labels.zip(colors).toTypedArray())
+                }
+                size = 45.0
+                hole = 0.55
+                stroke = 1.0
+                strokeColor = Theme.PAPER
+            }
+            layout { standard(title, ds, width, height, showLegend, blankAxes = true) }
+        }
+
+    /** A scatter plot of points coloured by a single [color] (or per-point). */
+    fun scatter(
+        ds: Dataset,
+        title: String,
+        xLabel: String,
+        yLabel: String,
+        x: List<Double>,
+        y: List<Double>,
+        color: Color,
+        pointSize: Double = 6.0,
+        width: Int = 1000,
+        height: Int = 820,
+    ): Plot =
+        plot {
+            points {
+                x(x) { axis.name = xLabel }
+                y(y) { axis.name = yLabel }
+                size = pointSize
+                this.color = color
+                alpha = 0.85
+            }
+            layout { standard(title, ds, width, height) }
+        }
+
+    /**
+     * A heatmap whose cells are coloured by explicit per-cell colours. [xs]/[ys]
+     * are parallel cell coordinates (categories) and [cellColors] the matching
+     * colours; an identity categorical scale maps each distinct colour to itself.
+     */
+    fun heatmap(
+        ds: Dataset,
+        title: String,
+        xLabel: String,
+        yLabel: String,
+        xs: List<String>,
+        ys: List<String>,
+        xOrder: List<String>,
+        yOrder: List<String>,
+        cellColors: List<Color>,
+        width: Int = 1200,
+        height: Int = 1100,
+    ): Plot {
+        val hexes = cellColors.map { (it as org.jetbrains.kotlinx.kandy.util.color.StandardColor.AsHexColor).hexString }
+        val distinct = hexes.distinct()
+        return plot {
+            tiles {
+                x(xs) {
+                    scale = categorical(categories = xOrder)
+                    axis.name = xLabel
+                }
+                y(ys) {
+                    scale = categorical(categories = yOrder)
+                    axis.name = yLabel
+                }
+                fillColor(hexes) {
+                    scale = categorical(*distinct.map { it to Color.hex(it) }.toTypedArray())
                 }
             }
             layout { standard(title, ds, width, height) }
