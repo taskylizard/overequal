@@ -60,7 +60,22 @@ object ChartStyle {
                 inset(PAD, PAD, PAD, PAD)
                 margin(MARGIN, MARGIN, MARGIN, MARGIN)
             }
-            if (!blankAxes) {
+            if (blankAxes) {
+                // Kandy 0.8.4's pie ignores Style.Void/blankAxes() — the cartesian
+                // frame (lines, ticks, numbers, "x"/"y" titles, grid) is still drawn
+                // around the donut. Blank each element explicitly (element_blank) so
+                // the donut stands alone.
+                panel.grid {
+                    majorLine { blank = true }
+                    minorLine { blank = true }
+                }
+                axis {
+                    line { blank = true }
+                    ticks { blank = true }
+                    text { blank = true }
+                    title { blank = true }
+                }
+            } else {
                 panel.grid {
                     majorLine {
                         color = Theme.GRID
@@ -85,7 +100,6 @@ object ChartStyle {
             legend {
                 position = if (showLegend) LegendPosition.Right else LegendPosition.None
             }
-            if (blankAxes) blankAxes()
         }
     }
 

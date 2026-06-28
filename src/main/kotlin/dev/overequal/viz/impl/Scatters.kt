@@ -45,6 +45,7 @@ object MentionScatter : Visualization {
                 x = x,
                 y = y,
                 color = Theme.PURPLE.getValue(500),
+                labels = top,
                 pointSize = 8.0,
             ).toPngBytes()
     }
@@ -69,6 +70,15 @@ object SpreadVsRate : Visualization {
         if (names.isEmpty()) return null
         val x = names.map { entropyBits(hours.getValue(it)) }
         val y = names.map { total.getValue(it).toDouble() / weeks.getValue(it).size }
+        // Every member is plotted, so labelling them all buries the chart. Name only
+        // the top ~30 by rate (y) and blank the rest, keeping the dense low-activity
+        // cluster legible.
+        val notable =
+            names.indices
+                .sortedByDescending { y[it] }
+                .take(30)
+                .toHashSet()
+        val labels = names.indices.map { if (it in notable) names[it] else "" }
         return Charts
             .scatter(
                 ds = ds,
@@ -78,6 +88,7 @@ object SpreadVsRate : Visualization {
                 x = x,
                 y = y,
                 color = Theme.BLUE.getValue(500),
+                labels = labels,
                 pointSize = 7.0,
             ).toPngBytes()
     }

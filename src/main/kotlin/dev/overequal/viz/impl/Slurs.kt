@@ -57,6 +57,16 @@ object SlursAggregate : Visualization {
     }
 }
 
+/** A member's slur/profanity rates plus the raw counts they were derived from. */
+private data class MemberRate(
+    val name: String,
+    val slurRate: Double,
+    val profRate: Double,
+    val slur: Int,
+    val prof: Int,
+    val msgs: Int,
+)
+
 /** Average slurs + profanity per message, per member, stacked. */
 object SlursPerMessage : Visualization {
     override val id = "slurs_per_message"
@@ -81,11 +91,13 @@ object SlursPerMessage : Visualization {
         val rows =
             msgs
                 .map { (name, n) ->
-                    Triple(name, (slur[name] ?: 0).toDouble() / n, (prof[name] ?: 0).toDouble() / n)
-                }.sortedByDescending { it.second + it.third }
+                    val s = slur[name] ?: 0
+                    val p = prof[name] ?: 0
+                    MemberRate(name, s.toDouble() / n, p.toDouble() / n, s, p, n)
+                }.sortedByDescending { it.slurRate + it.profRate }
                 .take(30)
         if (rows.isEmpty()) return null
-        val labels = rows.map { it.first }
+        val labels = rows.map { it.name }
         return Charts
             .stackedBarsH(
                 ds = ds,
@@ -97,9 +109,11 @@ object SlursPerMessage : Visualization {
                 seriesColors = mapOf("Slur" to Theme.RED.getValue(600), "Profanity" to Theme.GRAY.getValue(400)),
                 values =
                     mapOf(
-                        "Slur" to rows.map { it.second },
-                        "Profanity" to rows.map { it.third },
+                        "Slur" to rows.map { it.slurRate },
+                        "Profanity" to rows.map { it.profRate },
                     ),
+                // Show the raw breakdown behind each rate, e.g. "(4S + 30P / 300)".
+                barLabels = rows.map { "(${it.slur}S + ${it.prof}P / ${it.msgs})" },
             ).toPngBytes()
     }
 }

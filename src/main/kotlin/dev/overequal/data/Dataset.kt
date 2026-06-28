@@ -46,6 +46,20 @@ class Dataset(
     val start: Instant? = messages.minOfOrNull { it.timestamp }
     val end: Instant? = messages.maxOfOrNull { it.timestamp }
 
+    /**
+     * Snowflake user-ID → display name, gathered from every author and mention.
+     * Lets word charts turn raw `<@123…>` mention tokens (which survive
+     * tokenization as `@123…`) into `@name`. Names here already reflect redaction.
+     */
+    val userNamesById: Map<String, String> by lazy {
+        val byId = HashMap<String, String>()
+        for (m in messages) {
+            byId[m.authorId] = m.authorName
+            for (mn in m.mentions) if (mn.id != null) byId[mn.id] = mn.name
+        }
+        byId
+    }
+
     val contentRedacted: Boolean get() = options.redactContent
     val namesRedacted: Boolean get() = options.redactNames
 

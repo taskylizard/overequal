@@ -14,9 +14,23 @@ object Top30Words : Visualization {
     override val description = "Most common words after removing stopwords."
     override val requiresContent = true
 
+    /** A surviving Discord user-mention token: `@` followed by a raw snowflake ID. */
+    private val mentionId = Regex("""^@(\d+)$""")
+
+    /** Turn a raw `@123…` mention token into `@name` (lowercased, to match the
+     *  other word tokens); leave anything else untouched. */
+    private fun resolveMention(
+        word: String,
+        names: Map<String, String>,
+    ): String {
+        val id = mentionId.matchEntire(word)?.groupValues?.get(1) ?: return word
+        return names[id]?.let { "@${it.lowercase()}" } ?: word
+    }
+
     override fun render(ds: Dataset): ByteArray? {
+        val names = ds.userNamesById
         val counts = HashMap<String, Int>()
-        for (m in ds.messages) for (w in Words.contentWords(m.content)) counts.merge(w, 1, Int::plus)
+        for (m in ds.messages) for (w in Words.contentWords(m.content)) counts.merge(resolveMention(w, names), 1, Int::plus)
         val top =
             counts.entries
                 .sortedByDescending { it.value }

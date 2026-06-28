@@ -14,8 +14,11 @@ import org.jetbrains.kotlinx.kandy.letsplot.layers.bars
 import org.jetbrains.kotlinx.kandy.letsplot.layers.barsH
 import org.jetbrains.kotlinx.kandy.letsplot.layers.pie
 import org.jetbrains.kotlinx.kandy.letsplot.layers.points
+import org.jetbrains.kotlinx.kandy.letsplot.layers.text
 import org.jetbrains.kotlinx.kandy.letsplot.layers.tiles
+import org.jetbrains.kotlinx.kandy.letsplot.settings.font.FontFamily
 import org.jetbrains.kotlinx.kandy.util.color.Color
+import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
 
@@ -24,10 +27,48 @@ import kotlin.math.floor
  * visualization is just data prep + one call.
  */
 object Charts {
+    /** Point size (pt) for the value labels drawn at the end of bars. */
+    private const val VALUE_LABEL_SIZE = 7.0
+
+    /** Estimated glyph width at [VALUE_LABEL_SIZE] used to centre labels, as a fraction of the axis max. */
+    private const val CHAR_W_FRAC = 0.013
+
+    /** Looser glyph-width estimate used only to size the axis headroom (avoids right-clipping wide labels). */
+    private const val CHAR_W_SAFE_FRAC = 0.020
+
+    /** Gap between a bar tip and the start of its label, as a fraction of the axis max. */
+    private const val LABEL_PAD_FRAC = 0.012
+
+    /**
+     * Lays out end-of-bar labels. Kandy's text geom has no `hjust`, so a label
+     * centred on the bar tip would straddle it (the inner half vanishes against a
+     * dark bar). We emulate left-alignment by shifting each label's centre right by
+     * half its (estimated) width, and return the axis max needed so the longest
+     * label isn't clipped. [barEnds] are the bar tips; [texts] the labels.
+     */
+    private fun labelLayout(
+        barEnds: List<Double>,
+        texts: List<String>,
+    ): Pair<List<Double>, Double> {
+        val max = barEnds.maxOrNull() ?: 0.0
+        if (max <= 0.0) return barEnds to 1.0
+        val charW = max * CHAR_W_FRAC
+        val pad = max * LABEL_PAD_FRAC
+        val centers = barEnds.indices.map { barEnds[it] + pad + texts[it].length * charW / 2.0 }
+        // Size the axis off a looser width estimate so the widest label has room.
+        val safeW = max * CHAR_W_SAFE_FRAC
+        val rightEdge = barEnds.indices.maxOf { barEnds[it] + pad + texts[it].length * safeW }
+        return centers to maxOf(max, rightEdge) * 1.04
+    }
+
     /**
      * Horizontal bars with per-bar colours. [labels]/[values]/[colors] are given
      * in **top-to-bottom display order** (most important first); the categorical
      * y order is set so the first row sits at the top (config rule 10).
+     *
+     * Each bar is annotated with its value just past the tip (config: show the
+     * actual numbers). Pass [valueLabels] to control the text per bar (aligned to
+     * [labels]); otherwise [formatValue] is used (grouped integers, else 1–2 dp).
      */
     fun horizontalBars(
         ds: Dataset,
@@ -37,26 +78,49 @@ object Charts {
         values: List<Double>,
         colors: List<Color>,
         yLabel: String = "",
+        valueLabels: List<String>? = null,
         width: Int = 1100,
         height: Int = 900,
     ): Plot {
         // Lets-Plot draws the first y category at the bottom, so reverse to put
         // labels[0] at the top.
         val order = labels.asReversed()
-        return plot {
+        val texts = valueLabels ?: values.map(::formatValue)
+        val (labelX, xMax) = labelLayout(values, texts)
+        val data = mapOf("label" to labels, "value" to values)
+        return plot(data) {
             barsH {
-                y(labels) {
+                y("label") {
                     scale = categorical(categories = order)
                     axis.name = yLabel
                 }
-                x(values) { axis.name = xLabel }
-                fillColor(labels) {
+                x("value") { axis.name = xLabel }
+                fillColor("label") {
                     scale = categorical(*labels.zip(colors).toTypedArray())
                 }
+            }
+            // The trailing (xMax, "") entry is an invisible anchor: a continuous-scale
+            // max is ignored here, so we force the axis to reserve room for the widest
+            // label (auto-fit only ranges to data points, not rendered text width).
+            text {
+                y(labels + labels.first(), "ty") {}
+                x(labelX + xMax, "tx") {}
+                label(texts + "", "tl")
+                font.color = Theme.BLACK
+                font.size = VALUE_LABEL_SIZE
+                font.family = FontFamily.custom(Fonts.sans)
             }
             layout { standard(title, ds, width, height) }
         }
     }
+
+    /** Default bar-label text: grouped integers, else 1 dp (≥10) or 2 dp (<10). */
+    fun formatValue(v: Double): String =
+        when {
+            v == floor(v) && abs(v) < 1e15 -> "%,d".format(v.toLong())
+            abs(v) >= 10 -> "%,.1f".format(v)
+            else -> "%.2f".format(v)
+        }
 
     /**
      * Vertical bars over a continuous x, coloured by a frequency gradient within
@@ -140,7 +204,10 @@ object Charts {
             layout { standard(title, ds, width, height, showLegend, blankAxes = true) }
         }
 
-    /** A scatter plot of points coloured by a single [color] (or per-point). */
+    /**
+     * A scatter plot of points coloured by a single [color]. Pass [labels] (aligned
+     * to [x]/[y]) to annotate each dot — the label sits just above its point.
+     */
     fun scatter(
         ds: Dataset,
         title: String,
@@ -149,6 +216,7 @@ object Charts {
         x: List<Double>,
         y: List<Double>,
         color: Color,
+        labels: List<String>? = null,
         pointSize: Double = 6.0,
         width: Int = 1000,
         height: Int = 820,
@@ -160,6 +228,20 @@ object Charts {
                 size = pointSize
                 this.color = color
                 alpha = 0.85
+            }
+            if (labels != null && y.isNotEmpty()) {
+                // Nudge the label above the dot; the offset point also nudges the
+                // y auto-fit up so top labels aren't clipped.
+                val span = (y.max() - y.min()).let { if (it > 0) it else 1.0 }
+                val dy = span * 0.025
+                text {
+                    x(x, "lx") {}
+                    y(y.map { it + dy }, "ly") {}
+                    label(labels, "lt")
+                    font.color = Theme.BLACK
+                    font.size = VALUE_LABEL_SIZE
+                    font.family = FontFamily.custom(Fonts.sans)
+                }
             }
             layout { standard(title, ds, width, height) }
         }
@@ -178,6 +260,7 @@ object Charts {
         seriesOrder: List<String>,
         seriesColors: Map<String, Color>,
         values: Map<String, List<Double>>,
+        barLabels: List<String>? = null,
         showLegend: Boolean = true,
         width: Int = 1100,
         height: Int = 900,
@@ -194,6 +277,9 @@ object Charts {
         }
         val data = mapOf("y" to yCol, "x" to xCol, "g" to gCol)
         val scalePairs = seriesOrder.map { it to seriesColors.getValue(it) }.toTypedArray()
+        // Lay the optional end-labels out against each bar's total (stack height).
+        val totals = labels.indices.map { i -> seriesOrder.sumOf { values.getValue(it)[i] } }
+        val (labelX, xMax) = if (barLabels != null) labelLayout(totals, barLabels) else (totals to 0.0)
         return plot(data) {
             barsH {
                 y("y") {
@@ -203,6 +289,18 @@ object Charts {
                 x("x") { axis.name = xLabel }
                 fillColor("g") { scale = categorical(*scalePairs) }
                 position = Position.stack()
+            }
+            if (barLabels != null) {
+                // Trailing (xMax, "") entry is an invisible anchor reserving axis room
+                // for the widest label (see horizontalBars).
+                text {
+                    y(labels + labels.first(), "ty") {}
+                    x(labelX + xMax, "tx") {}
+                    label(barLabels + "", "tl")
+                    font.color = Theme.BLACK
+                    font.size = VALUE_LABEL_SIZE
+                    font.family = FontFamily.custom(Fonts.sans)
+                }
             }
             layout { standard(title, ds, width, height, showLegend) }
         }

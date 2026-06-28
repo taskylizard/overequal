@@ -158,9 +158,32 @@ external deps per the user's preference.
 
 ## Known quirks
 
-- Kandy 0.8.4 `pie` ignores theme axis-blanking (`Style.Void`/`blankAxes()` have no
-  effect on the cartesian axes drawn around a pie) — the donut shows faint axes. Cosmetic;
-  revisit later (possibly via a coord tweak or a newer Kandy).
+- Kandy 0.8.4 `pie` ignores `Style.Void`/`blankAxes()` (the cartesian frame is still
+  drawn around the donut). Fixed in `ChartStyle.flexoki`'s `blankAxes` branch by
+  blanking each element explicitly (`element_blank`): `panel.grid` major+minor and
+  `axis { line/ticks/text/title { blank = true } }`. The per-element flag works where
+  the whole-axis `blankAxes()` did not.
+
+## Value / point labels on charts
+
+- Bar charts show the actual number at each bar tip. `Charts.horizontalBars` labels
+  every bar (default via `formatValue`: grouped ints, else 1–2 dp; override with
+  `valueLabels`). `Charts.stackedBarsH` takes an optional `barLabels` — the slurs
+  per-message chart passes a composite `(4S + 30P / 300)` (slur + profanity counts
+  over messages, the raw numbers behind the rate).
+- `Charts.scatter` takes optional `labels` to name each dot (a `""` entry leaves a
+  dot unlabelled). `mention_scatter` names all 30 points; `spread_vs_rate` plots
+  every member, so it labels only the top ~30 by rate and blanks the rest to keep
+  the dense low-activity cluster legible.
+- Kandy's `text` geom has **no `hjust`/`vjust`**, so labels are centred on their
+  (x, y). End-of-bar labels emulate left-align via `labelLayout` (shift each centre
+  right by ~half the estimated text width) and reserve axis room with an invisible
+  anchor point `(xMax, "")` — a continuous-scale max is **ignored** for positional
+  axes (lets-plot auto-fits to data points, not rendered text width), so the anchor
+  is how we force headroom. Scatter labels are nudged up by ~2.5% of the y-span.
+- Word charts: raw `<@123…>` user mentions survive tokenization as `@123…`.
+  `Top30Words` rewrites them to `@name` via `Dataset.userNamesById` (snowflake →
+  display name, gathered from authors + mentions, so it honours redaction).
 
 ## Status
 
