@@ -281,6 +281,10 @@ object Charts {
                     y("y") { axis.name = yLabel }
                     fillColor("g") { scale = categorical(*scalePairs) }
                     alpha = 0.9
+                    // Separate the bands with a paper hairline (as the donut does).
+                    // Lets-Plot otherwise draws the area border in its default blue.
+                    borderLine.color = Theme.PAPER
+                    borderLine.width = 0.6
                     position = Position.stack()
                 }
             } else {

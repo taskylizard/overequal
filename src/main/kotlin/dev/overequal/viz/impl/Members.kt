@@ -91,9 +91,14 @@ object SharePie : Visualization {
         val named = counts.take(topN)
         val othersCount = total - named.sumOf { it.value }
 
-        val labels = named.map { it.key } + "Others"
         val values = named.map { it.value.toDouble() } + othersCount.toDouble()
         val colors = named.indices.map { Theme.distinct(it) } + Theme.GRAY.getValue(300)
+        // Kandy 0.8.4's pie has no text aesthetic, so the per-slice percentage rides
+        // in the (legend) label: "alice — 23.4%".
+        val labels =
+            (named.map { it.key } + "Others").mapIndexed { i, name ->
+                "$name — %.1f%%".format(values[i] * 100.0 / total)
+            }
 
         val title = "Share of Messages by Author  —  $half members = ${(cum * 100 / total)}% of all"
         return Charts.donut(ds, title, labels, values, colors, showLegend = true).toPngBytes()
