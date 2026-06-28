@@ -15,8 +15,16 @@ import org.jetbrains.kotlinx.kandy.util.context.invoke
  * `Style.None` so nothing from a base theme leaks through.
  */
 object ChartStyle {
-    /** Fixed breathing room (px) between the plotting area and the canvas edges. */
+    /** Inner breathing room (px) between the plotting area and the labels/edges. */
     private const val PAD = 28.0
+
+    /** Outer margin (px) around the whole plot, outside the title and axis labels. */
+    private const val MARGIN = 32.0
+
+    /** Font sizes (pt) for the plot title, axis titles, and axis tick labels. */
+    private const val TITLE_SIZE = 24.0
+    private const val AXIS_TITLE_SIZE = 18.0
+    private const val AXIS_TEXT_SIZE = 15.0
 
     fun Layout.flexoki(
         showLegend: Boolean = false,
@@ -36,7 +44,10 @@ object ChartStyle {
                     color = Theme.BLACK
                     this.fontFamily = fontFamily
                 }
-                title { this.fontFamily = fontFamily }
+                title {
+                    this.fontFamily = fontFamily
+                    fontSize = TITLE_SIZE
+                }
             }
             plotCanvas {
                 background {
@@ -44,9 +55,10 @@ object ChartStyle {
                     borderLineColor = Theme.PAPER
                     borderLineWidth = 0.0
                 }
-                // Fixed padding between the plot panel and the canvas edges, so titles,
-                // axis labels and bars never crowd the border.
+                // inset: gap between the plot panel and the axis labels.
+                // margin: outer padding around the whole plot, outside the title and labels.
                 inset(PAD, PAD, PAD, PAD)
+                margin(MARGIN, MARGIN, MARGIN, MARGIN)
             }
             if (!blankAxes) {
                 panel.grid {
@@ -66,6 +78,8 @@ object ChartStyle {
                         color = Theme.BLACK
                         width = 0.6
                     }
+                    title { fontSize = AXIS_TITLE_SIZE }
+                    text { fontSize = AXIS_TEXT_SIZE }
                 }
             }
             legend {
