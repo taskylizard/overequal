@@ -4,6 +4,7 @@ import dev.overequal.data.Dataset
 import dev.overequal.data.DatasetLoader
 import dev.overequal.data.MessageCache
 import dev.overequal.data.RenderOptions
+import dev.overequal.scrape.MessageWatcher
 import dev.overequal.scrape.Scraper
 import dev.overequal.viz.Visualization
 import dev.overequal.viz.Visualizations
@@ -40,6 +41,7 @@ class Bot(
     private val log = LoggerFactory.getLogger(Bot::class.java)
     private val cache = MessageCache(config.dataDir)
     private val scraper = Scraper(cache, config.scrapeRatePerSecond)
+    private val messageWatcher = MessageWatcher(cache)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     /**
@@ -84,6 +86,7 @@ class Bot(
                     scope.launch { handle(ev) }
                 }
             }
+            scope.launch { messageWatcher.watch(gateway, scope) }
 
             gateway.onDisconnect().awaitFirstOrNull()
         }
