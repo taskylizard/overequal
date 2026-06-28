@@ -3,11 +3,16 @@ package dev.overequal.viz
 import dev.overequal.data.Dataset
 import dev.overequal.viz.impl.CltDaily
 import dev.overequal.viz.impl.Hourly
+import dev.overequal.viz.impl.HourlyGrid
 import dev.overequal.viz.impl.MentionRatio
+import dev.overequal.viz.impl.MentionScatter
+import dev.overequal.viz.impl.Mentions
 import dev.overequal.viz.impl.MessageLength
 import dev.overequal.viz.impl.MessageLengthPerMember
 import dev.overequal.viz.impl.MessagesPerDay
 import dev.overequal.viz.impl.SharePie
+import dev.overequal.viz.impl.SpreadVsRate
+import dev.overequal.viz.impl.Timeline
 import dev.overequal.viz.impl.Top30
 import dev.overequal.viz.impl.Top30Words
 import dev.overequal.viz.impl.UniqueMembers
@@ -27,6 +32,11 @@ object Visualizations {
             CltDaily,
             MessageLengthPerMember,
             UniqueMembers,
+            MentionScatter,
+            SpreadVsRate,
+            Mentions,
+            HourlyGrid,
+            Timeline,
             Top30Words,
         )
 

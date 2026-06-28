@@ -199,4 +199,82 @@ object Charts {
             layout { standard(title, ds, width, height) }
         }
     }
+
+    /**
+     * A heatmap coloured by a continuous value gradient within one [hue]
+     * (light = small, dark = large). [xs]/[ys]/[values] are parallel per-cell lists.
+     */
+    fun heatmapValue(
+        ds: Dataset,
+        title: String,
+        xLabel: String,
+        yLabel: String,
+        xs: List<String>,
+        ys: List<String>,
+        xOrder: List<String>,
+        yOrder: List<String>,
+        values: List<Double>,
+        hue: Map<Int, Color>,
+        width: Int = 1200,
+        height: Int = 1100,
+    ): Plot =
+        plot {
+            tiles {
+                x(xs) {
+                    scale = categorical(categories = xOrder)
+                    axis.name = xLabel
+                }
+                y(ys) {
+                    scale = categorical(categories = yOrder)
+                    axis.name = yLabel
+                }
+                fillColor(values) {
+                    scale = continuous(range = hue.getValue(50)..hue.getValue(900))
+                }
+            }
+            layout { standard(title, ds, width, height) }
+        }
+
+    /**
+     * A heatmap with a continuous numeric x (e.g. fractional year) and a
+     * categorical y, cells coloured by explicit per-cell colours. Used for the
+     * weekly activity timeline, where there are too many time buckets to label
+     * categorically.
+     */
+    fun heatmapTimeline(
+        ds: Dataset,
+        title: String,
+        xLabel: String,
+        yLabel: String,
+        x: List<Double>,
+        ys: List<String>,
+        yOrder: List<String>,
+        cellColors: List<Color>,
+        tileWidth: Double,
+        width: Int = 1300,
+        height: Int = 1000,
+    ): Plot {
+        val hexes = cellColors.map { (it as org.jetbrains.kotlinx.kandy.util.color.StandardColor.AsHexColor).hexString }
+        val distinct = hexes.distinct()
+        return plot {
+            tiles {
+                x(x) {
+                    axis.name = xLabel
+                    val years = ceil(x.min()).toInt()..floor(x.max()).toInt()
+                    if (years.first <= years.last) {
+                        axis.breaksLabeled(years.map { it.toDouble() }, years.map { it.toString() })
+                    }
+                }
+                y(ys) {
+                    scale = categorical(categories = yOrder)
+                    axis.name = yLabel
+                }
+                this.width = tileWidth
+                fillColor(hexes) {
+                    scale = categorical(*distinct.map { it to Color.hex(it) }.toTypedArray())
+                }
+            }
+            layout { standard(title, ds, width, height) }
+        }
+    }
 }
