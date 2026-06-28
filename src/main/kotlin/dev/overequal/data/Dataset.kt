@@ -10,6 +10,12 @@ data class Mention(
     val name: String,
 )
 
+/** A reaction on a message: [key] is the display label (`:shortcode:` or raw char), [count] the tally. */
+data class Reaction(
+    val key: String,
+    val count: Int,
+)
+
 /** Analysis-ready, parsed message. Compact on purpose — corpora reach ~1M rows. */
 data class Message(
     val timestamp: Instant,
@@ -19,6 +25,7 @@ data class Message(
     val content: String,
     val mentions: List<Mention>,
     val channel: String,
+    val reactions: List<Reaction> = emptyList(),
 )
 
 /**

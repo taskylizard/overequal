@@ -4,8 +4,10 @@ import dev.overequal.data.CacheMeta
 import dev.overequal.data.ChannelCursor
 import dev.overequal.data.MessageCache
 import dev.overequal.data.RawChannel
+import dev.overequal.data.RawEmoji
 import dev.overequal.data.RawGuild
 import dev.overequal.data.RawMessage
+import dev.overequal.data.RawReaction
 import dev.overequal.data.RawUser
 import dev.overequal.data.Time
 import discord4j.common.util.Snowflake
@@ -152,6 +154,7 @@ class Scraper(
                     content = m.content,
                     author = author.toRaw(),
                     mentions = m.userMentions.map { it.toRaw() },
+                    reactions = m.reactions.map { it.toRaw() },
                     channel = RawChannel(ch.id.asString(), null, category, ch.name),
                     guild = RawGuild(guild.id.asString(), guild.name),
                 ),
@@ -222,6 +225,22 @@ class Scraper(
     }
 
     private fun discord4j.core.`object`.entity.User.toRaw(): RawUser = RawUser(id.asString(), username, globalName.orElse(null), isBot)
+
+    /**
+     * Snapshot a live [Reaction] into the cache shape. A custom emoji keeps its id +
+     * name + animated flag; a unicode emoji stores the raw char as `name`. The
+     * `code` shortcode is only present in the reference export, never live, so it's
+     * left null here ([RawEmoji.displayKey] falls back to the char).
+     */
+    private fun discord4j.core.`object`.reaction.Reaction.toRaw(): RawReaction {
+        val e = emoji
+        val raw =
+            e
+                .asCustomEmoji()
+                .map { c -> RawEmoji(id = c.id.asString(), name = c.name, isAnimated = c.isAnimated) }
+                .orElseGet { RawEmoji(name = e.asUnicodeEmoji().map { it.raw }.orElse(null)) }
+        return RawReaction(emoji = raw, count = count)
+    }
 
     companion object {
         /** Messages buffered in memory before a flush to disk + metadata rewrite. */

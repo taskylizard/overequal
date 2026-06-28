@@ -44,6 +44,11 @@ object DatasetLoader {
                                 .map { Mention(it.id, it.name) }
                                 .toList(),
                         channel = raw.channel?.name ?: "",
+                        // Reactions carry no names/content, so they're exempt from redaction.
+                        reactions =
+                            raw.reactions.mapNotNull { r ->
+                                r.emoji?.displayKey()?.let { Reaction(it, r.count) }
+                            },
                     )
                 }.toList()
 

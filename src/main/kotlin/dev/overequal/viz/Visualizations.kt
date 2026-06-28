@@ -20,6 +20,8 @@ import dev.overequal.viz.impl.SpreadVsRate
 import dev.overequal.viz.impl.Timeline
 import dev.overequal.viz.impl.Top30
 import dev.overequal.viz.impl.Top30Words
+import dev.overequal.viz.impl.TopEmojis
+import dev.overequal.viz.impl.TopReactions
 import dev.overequal.viz.impl.UniqueMembers
 import dev.overequal.viz.impl.Weekly
 import dev.overequal.viz.impl.WeeklyRate
@@ -50,6 +52,8 @@ object Visualizations {
             Top30Words,
             SlursAggregate,
             SlursPerMessage,
+            TopEmojis,
+            TopReactions,
         )
 
     val byId: Map<String, Visualization> = all.associateBy { it.id }

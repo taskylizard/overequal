@@ -33,10 +33,42 @@ data class RawUser(
     @SerialName("isBot") val isBot: Boolean = false,
 )
 
+/**
+ * A reaction on a message. [emoji] identifies which emoji; [count] is how many
+ * people reacted with it (a point-in-time snapshot taken when the message was
+ * scraped — reactions added later are only picked up if the message is re-scraped).
+ */
 @Serializable
 data class RawReaction(
+    val emoji: RawEmoji? = null,
     val count: Int = 0,
 )
+
+/**
+ * The emoji of a reaction, mirroring `datavis/data-format.md`. A custom server
+ * emoji has a non-blank [id] and a [name] (e.g. `pepeJAM`); a standard emoji has
+ * [name] = the raw unicode char and (in the reference export) [code] = its
+ * shortcode (e.g. `sob`). The shortcode is preferred for display because it always
+ * renders as plain text; live scrapes have no shortcode and fall back to the char.
+ */
+@Serializable
+data class RawEmoji(
+    val id: String? = null,
+    val name: String? = null,
+    val code: String? = null,
+    @SerialName("isAnimated") val isAnimated: Boolean = false,
+) {
+    /**
+     * The label to count/display this reaction under, or `null` if the emoji can't
+     * be identified. Custom emojis → `:name:`; unicode → `:shortcode:` when known,
+     * else the raw char.
+     */
+    fun displayKey(): String? {
+        if (!id.isNullOrBlank()) return name?.takeIf { it.isNotBlank() }?.let { ":$it:" }
+        code?.takeIf { it.isNotBlank() }?.let { return ":$it:" }
+        return name?.takeIf { it.isNotBlank() }
+    }
+}
 
 @Serializable
 data class RawChannel(
