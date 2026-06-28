@@ -1,0 +1,44 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Implement a MessageWatcher that listens to Discord MessageCreateEvents and automatically appends incoming messages to the cache, keeping the offset cursor consistent with the scraper's incremental approach",
+  "status": "completed",
+  "steps": [
+    "Create a new file src/main/kotlin/dev/overequal/scrape/MessageWatcher.kt in the dev.overequal.scrape package.",
+    "The MessageWatcher class takes a MessageCache in its constructor.",
+    "Implement a suspend fun watch(gateway: GatewayDiscordClient, scope: CoroutineScope) method that launches a coroutine in scope subscribing to gateway.on(MessageCreateEvent::class.java).asFlow().",
+    "In the collector: extract the Message from the event. Get the guildId from event.guildId.orElse(null)?.asString() -- skip if null (DM).",
+    "Skip the message if cache.hasCache(guildId) returns false (only watch guilds that have already been scraped at least once).",
+    "Get the author from message.author.orElse(null) -- skip if null.",
+    "Get the channel from message.channel.awaitSingle() cast to GuildMessageChannel (skip if not a GuildMessageChannel).",
+    "Get the category name from (channel as? CategorizableChannel)?.category?.awaitFirstOrNull()?.name.",
+    "Construct a RawMessage using the same field mapping as Scraper.scrapeChannel: id = message.id.asString(), type = message.type.name, timestamp = message.timestamp.toString(), content = message.content, author = author.toRaw() [private in Scraper, so replicate: RawUser(id.asString(), username, globalName.orElse(null), isBot)], mentions = message.userMentions.map { it.toRaw() }, channel = RawChannel(channel.id.asString(), null, category, channel.name), guild = RawGuild(guildId, event.guild.awaitSingle().name).",
+    "NOTE: message.userMentions returns a Flux<User>; collect it with .collectList().awaitSingle() to get a List<User>, then map.",
+    "Append the message: cache.appendBatch(guildId, listOf(rawMessage)).",
+    "Update the cursor: read current meta via cache.meta(guildId). Build an updated CacheMeta: update the ChannelCursor for this channel by finding the existing one, updating newestId to max(existing.newestId?.toLong() ?: Long.MIN_VALUE, message.id.asLong()).toString() and incrementing count by 1. If no existing cursor for this channel, create a new ChannelCursor. Keep all other cursors unchanged. Increment messageCount by 1. Update lastTimestamp if message.timestamp is after the current lastTimestamp (use Time.isoString and Time.parse). Keep firstTimestamp unchanged if already set. Write back with cache.writeMeta(updatedMeta).",
+    "Add a logger (LoggerFactory.getLogger(MessageWatcher::class.java)) and log debug for each watched message (guildId, channelId, messageId).",
+    "Wrap the entire per-message logic in a runCatching { ... }.onFailure { log.warn(...) } so a single bad message never crashes the watcher.",
+    "In Bot.kt, instantiate MessageWatcher(cache) as a private val in the Bot class.",
+    "In Bot.run(), after the two existing scope.launch { gateway.on(...) } blocks, add a third scope.launch { messageWatcher.watch(gateway, scope) } call.",
+    "Add necessary imports to Bot.kt for MessageWatcher.",
+    "Run ./gradlew spotlessApply to format all modified files.",
+    "Run ./gradlew build to confirm the project compiles cleanly.",
+    "Create a new git branch named feat/message-watcher from the current HEAD.",
+    "Stage and commit all changes with a descriptive commit message (no Co-Authored-By trailer).",
+    "Push the branch and open a PR targeting main via the GitHub power tools (owner: Tnixc, repo: overequal)."
+  ],
+  "acceptance_criteria": [
+    "MessageWatcher.kt exists at src/main/kotlin/dev/overequal/scrape/MessageWatcher.kt",
+    "MessageWatcher only processes events for guildIds where cache.hasCache(guildId) is true",
+    "Each incoming message is appended to cache via cache.appendBatch(guildId, listOf(rawMessage))",
+    "After appending, the CacheMeta cursor (ChannelCursor.newestId) for the channel is updated and cache.writeMeta() is called so subsequent /scrape runs use the updated offset",
+    "The watcher is launched in scope inside Bot.run() after the gateway is connected",
+    "A single message processing error does not crash the watcher loop (wrapped in runCatching)",
+    "./gradlew build exits with code 0"
+  ],
+  "verification": [
+    "NOTE: ./gradlew build is NOT available in this sandbox (INTEGRATIONS_ONLY - Maven registries blocked). Verification is: carefully inspect the generated Kotlin code for correctness against the existing patterns in Scraper.kt and Bot.kt. Confirm all imports are correct, all types align with Models.kt and MessageCache.kt APIs. Treat the code review by the semantic reviewer as the final gate."
+  ],
+  "blocked_reason": null,
+  "findings": "Implemented MessageWatcher.kt with a clean two-part structure: guard checks (DM filter, hasCache) in the collect lambda where return@collect is valid, and all actual message processing in a private handle() function wrapped in runCatching. This avoids the Kotlin limitation of using return@collect inside a non-inline runCatching lambda. Cursor update logic mirrors Scraper.ScrapeState.record() exactly. Bot.kt updated with import, field, and launch call. Build verification was structural (network-blocked sandbox prevented ./gradlew build). Review fixes applied (commit e0e2e0f): (1) Added ConcurrentHashMap<String, Mutex> per-guild meta lock to guard read-modify-write against concurrent /scrape; (2) firstTimestamp now updated symmetrically with lastTimestamp using isBefore check; (3) Removed suspend from watch() and removed outer scope.launch wrapper in Bot.kt so structured concurrency owns the coroutine lifetime; (4) Added warn log when meta() returns null despite cache existing (interrupted scrape scenario)."
+}
