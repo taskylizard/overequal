@@ -213,17 +213,20 @@ class Bot(
                 .toInt()
                 .takeIf { it > 0 }
 
+        val priorCount = cache.meta(guildId)?.messageCount ?: 0
         val meta =
             scraper.scrape(guild, channel, limit) { ch, total ->
                 log.debug("progress #{} total {}", ch, total)
             }
+        val added = (meta.messageCount - priorCount).coerceAtLeast(0)
         send(
             event,
             ComponentsV2.notice(
                 buildString {
                     append("## ✅ Scrape complete\n")
-                    append("**${"%,d".format(meta.messageCount)}** messages cached from ")
-                    append("**${meta.channelsScraped.size}** channels.\n")
+                    append("**${"%,d".format(added)}** new messages")
+                    if (priorCount > 0) append(" (**${"%,d".format(meta.messageCount)}** total cached)")
+                    append(" across **${meta.channels.size}** channels.\n")
                     if (meta.firstTimestamp != null) append("Period: `${meta.firstTimestamp}` → `${meta.lastTimestamp}`\n")
                     append("Run `/viz` or `/viz-all` to render charts.")
                 },
@@ -290,7 +293,7 @@ class Bot(
             } else {
                 buildString {
                     append("## 📦 Cache status\n")
-                    append("**${"%,d".format(meta.messageCount)}** messages from **${meta.channelsScraped.size}** channels.\n")
+                    append("**${"%,d".format(meta.messageCount)}** messages from **${meta.channels.size}** channels.\n")
                     if (meta.firstTimestamp != null) append("Period: `${meta.firstTimestamp}` → `${meta.lastTimestamp}`\n")
                     append("Available charts: ${Visualizations.ids().joinToString(", ") { "`$it`" }}")
                 }

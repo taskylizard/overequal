@@ -4,10 +4,10 @@ import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
-import java.time.Instant
+import java.nio.file.StandardOpenOption
 import kotlin.io.path.bufferedReader
-import kotlin.io.path.bufferedWriter
 import kotlin.io.path.createDirectories
+import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
 
 /**
@@ -47,48 +47,56 @@ class MessageCache(
         return runCatching { json.decodeFromString<CacheMeta>(Files.readString(p)) }.getOrNull()
     }
 
-    /** Overwrite the cached corpus for a guild and refresh its metadata. */
-    fun write(
-        guildId: String,
-        guildName: String,
-        messages: List<RawMessage>,
-        channelsScraped: List<String>,
-    ): CacheMeta {
+    /** Clear a guild's cached corpus (used before a fresh, full scrape). */
+    fun truncate(guildId: String) {
         guildDir(guildId).createDirectories()
-        messagesPath(guildId).bufferedWriter().use { w ->
-            for (m in messages) {
-                w.write(json.encodeToString(RawMessage.serializer(), m))
-                w.newLine()
-            }
-        }
-        val sorted = messages.mapNotNull { runCatching { Time.parse(it.timestamp) }.getOrNull() }.sorted()
-        val meta =
-            CacheMeta(
-                guildId = guildId,
-                guildName = guildName,
-                messageCount = messages.size,
-                firstTimestamp = sorted.firstOrNull()?.let { Time.isoString(it) },
-                lastTimestamp = sorted.lastOrNull()?.let { Time.isoString(it) },
-                channelsScraped = channelsScraped,
-                scrapedAtEpochSeconds = Instant.now().epochSecond,
-            )
-        Files.writeString(metaPath(guildId), json.encodeToString(CacheMeta.serializer(), meta))
-        log.info("cached {} messages for guild {} ({})", messages.size, guildName, guildId)
-        return meta
+        messagesPath(guildId).deleteIfExists()
+    }
+
+    /**
+     * Append a batch of messages to a guild's JSONL, creating the file/dir if
+     * needed. Used by the scraper to flush periodically so progress is durable and
+     * memory stays bounded.
+     */
+    fun appendBatch(
+        guildId: String,
+        messages: List<RawMessage>,
+    ) {
+        if (messages.isEmpty()) return
+        guildDir(guildId).createDirectories()
+        val text = buildString { messages.forEach { append(json.encodeToString(RawMessage.serializer(), it)).append('\n') } }
+        Files.writeString(
+            messagesPath(guildId),
+            text,
+            StandardOpenOption.CREATE,
+            StandardOpenOption.APPEND,
+        )
+    }
+
+    /** Persist the metadata sidecar (cursors, counts, period). */
+    fun writeMeta(meta: CacheMeta) {
+        guildDir(meta.guildId).createDirectories()
+        Files.writeString(metaPath(meta.guildId), json.encodeToString(CacheMeta.serializer(), meta))
     }
 
     fun read(guildId: String): List<RawMessage> = readJsonl(messagesPath(guildId))
 
-    /** Read any JSONL file of [RawMessage] records (cache file or reference corpus). */
+    /**
+     * Read any JSONL file of [RawMessage] records (cache file or reference corpus),
+     * de-duplicating by message [RawMessage.id] — cheap insurance against any
+     * overlap at flush/resume boundaries. Records without an id are always kept.
+     */
     fun readJsonl(path: Path): List<RawMessage> {
         if (!path.exists()) return emptyList()
         val out = ArrayList<RawMessage>()
+        val seen = HashSet<String>()
         path.bufferedReader().useLines { lines ->
             for (line in lines) {
                 if (line.isBlank()) continue
                 runCatching { json.decodeFromString(RawMessage.serializer(), line) }
-                    .onSuccess { out.add(it) }
-                    .onFailure { log.warn("skipped unparseable line: {}", it.message) }
+                    .onSuccess { m ->
+                        if (m.id == null || seen.add(m.id)) out.add(m)
+                    }.onFailure { log.warn("skipped unparseable line: {}", it.message) }
             }
         }
         return out

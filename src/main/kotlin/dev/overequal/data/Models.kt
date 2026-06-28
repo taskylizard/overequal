@@ -53,8 +53,25 @@ data class RawGuild(
 )
 
 /**
+ * Per-channel scrape cursor. [newestId] is the highest message snowflake seen in
+ * the channel, so a later run can fetch only genuinely new messages via
+ * `getMessagesAfter(newestId)` instead of re-walking history.
+ */
+@Serializable
+data class ChannelCursor(
+    val channelId: String,
+    val name: String,
+    val newestId: String? = null,
+    val count: Int = 0,
+)
+
+/**
  * Metadata sidecar written next to a guild's cached corpus so the bot can report
  * what is cached without re-reading the whole (potentially huge) JSONL file.
+ *
+ * Maintained incrementally as batches are flushed: [messageCount] and the
+ * first/last timestamps span everything cached so far, and [channels] carries a
+ * resume cursor per channel.
  */
 @Serializable
 data class CacheMeta(
@@ -63,6 +80,8 @@ data class CacheMeta(
     val messageCount: Int,
     val firstTimestamp: String?,
     val lastTimestamp: String?,
-    val channelsScraped: List<String>,
+    val channels: List<ChannelCursor> = emptyList(),
     val scrapedAtEpochSeconds: Long,
-)
+) {
+    fun cursorFor(channelId: String): ChannelCursor? = channels.firstOrNull { it.channelId == channelId }
+}

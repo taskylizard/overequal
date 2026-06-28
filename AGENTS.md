@@ -72,6 +72,21 @@ per-bar frequency gradient (same hue, darker = larger); grid lines `BLACK @ alph
 `ChartStyle`); most-active member at the TOP of bar charts. Charts get a fixed padding
 inset around the plotting area (`ChartStyle.PAD`).
 
+## Scraping (incremental + durable)
+
+`scrape/Scraper.kt` streams each channel's history as a coroutine flow and flushes
+to disk in batches of `BATCH_SIZE` (500), rewriting `meta.json` after every flush —
+so memory stays bounded on huge guilds and an interrupted run keeps everything
+already written. Per-channel **cursors** (`ChannelCursor.newestId`, the highest
+message snowflake seen) live in `CacheMeta.channels`. Re-running `/scrape`:
+- no cursor yet → full history backfill (`getMessagesBefore(now)`),
+- cursor present → only messages newer than it (`getMessagesAfter(newestId)`),
+  so we never re-download what we already have (**forward-only incremental**; an
+  interrupted *initial* backfill isn't resumed from its oldest point, just picked up
+  forward of the newest cached message). `MessageCache.readJsonl` de-dups by `id`,
+  so any boundary overlap is harmless. `CacheMeta.messageCount`/first/last span the
+  whole cache and accumulate across runs.
+
 ## Architecture (planned)
 
 ```
