@@ -118,7 +118,16 @@ external deps per the user's preference.
 
 ## Status
 
-Visualizations done (render from the corpus, verified against a 60k sample): top30,
-weekly_rate, share_pie (donut), mention_ratio, hourly, message_length,
-messages_per_day_dist, clt_daily, message_length_per_member, unique_members, top30_words.
-See `git log` for the running checkpoint history.
+**Feature-complete.** 22 corpus visualizations implemented and verified against a 60k
+sample (top30, weekly_rate, share_pie, mention_ratio, hourly, message_length,
+messages_per_day_dist, clt_daily, message_length_per_member, unique_members,
+mention_scatter, spread_vs_rate, spread_distribution, mentions, hourly_grid, timeline,
+weekly, cumulative_share, cumulative_absolute, top30_words, slurs_aggregate,
+slurs_per_message). LLM charts (topics/sentiment/typos) and the word-cloud are out of scope.
+
+Bot (`Bot.kt`): `/scrape /viz /viz-all /status`, Components V2 output, per-guild command
+registration. Live-verified login + command registration with the real token. Scraping
+message text needs MESSAGE_CONTENT enabled in the Developer Portal (else gateway 4014);
+`MESSAGE_CONTENT_INTENT=false` lets the bot run without it. Headless CLI: `render`.
+
+See `git log` for the running checkpoint history and `README.md` for setup/run.
