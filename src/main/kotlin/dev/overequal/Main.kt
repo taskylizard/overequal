@@ -1,18 +1,19 @@
 package dev.overequal
 
+import dev.overequal.bot.Bot
 import dev.overequal.cli.RenderCli
 
 /**
  * Entry point. Subcommands:
  *   render …   headless: render visualizations from a JSONL corpus to PNGs.
- *   bot        run the Discord bot (added in a later checkpoint).
+ *   bot        run the Discord bot (token from DISCORD_TOKEN / .env).
  */
 fun main(args: Array<String>) {
     System.setProperty("java.awt.headless", "true")
 
     when (args.firstOrNull()) {
         "render" -> RenderCli.run(args.drop(1))
-        "bot" -> println("bot mode not wired yet — coming in a later checkpoint")
+        "bot" -> Bot.start()
         else ->
             println(
                 """
